@@ -1,0 +1,45 @@
+[workspace]
+resolver = "3"
+members = ["crates/filigrane-core", "crates/filigrane-cli", "crates/filigrane-gui"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+authors = ["Florian Langlois"]
+repository = "https://github.com/Aquadrox/filigrane-pdf"
+
+[workspace.dependencies]
+filigrane-core = { path = "crates/filigrane-core" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+lopdf = "0.47"
+memmap2 = "0.9"
+pdfium-render = "0.9.5"
+rayon = "1"
+subsetter = "0.2.6"
+thiserror = "2"
+tiny-skia = "0.12"
+ttf-parser = "0.25"
+clap = { version = "4", features = ["derive"] }
+eframe = { version = "0.37", features = ["persistence"] }
+rfd = "0.17"
+opener = { version = "0.9", features = ["reveal"] }
+serde = { version = "1", features = ["derive"] }
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Les tests manipulent des PDF de plusieurs milliers de pages : optimiser les dépendances.
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,26 @@
+name: Publication
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: PDFium
+        run: ./scripts/fetch-pdfium.ps1
+      - run: cargo test --workspace
+      - run: cargo build --release --workspace
+      - name: Paquet portable et installeur
+        run: ./packaging/windows/package.ps1 -Installer
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

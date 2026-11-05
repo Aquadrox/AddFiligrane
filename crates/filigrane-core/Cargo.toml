@@ -1,0 +1,25 @@
+[package]
+name = "filigrane-core"
+description = "Ajout de filigranes texte à des documents PDF, y compris très volumineux."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+image.workspace = true
+lopdf.workspace = true
+memmap2.workspace = true
+pdfium-render.workspace = true
+rayon.workspace = true
+subsetter.workspace = true
+thiserror.workspace = true
+tiny-skia.workspace = true
+ttf-parser.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

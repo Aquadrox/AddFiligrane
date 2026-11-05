@@ -1,0 +1,3 @@
+# PDFium pour `cargo test` / `cargo run` en développement (voir scripts/fetch-pdfium.*).
+[env]
+FILIGRANE_PDFIUM = { value = ".pdfium", relative = true }
