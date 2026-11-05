@@ -13,8 +13,14 @@ const TILED_AUTO_DIVISOR: f64 = 85.0;
 const TILED_MIN_AUTO_SIZE: f64 = 7.0;
 /// Garde-fou contre les mosaïques démesurées (très grandes pages, texte minuscule).
 const MAX_TILES: usize = 4_000;
+/// Taille de grille examinée au plus avant élimination des tuiles hors page.
+const MAX_GRID_CELLS: f64 = 64_000.0;
+/// Au-delà, la page est jugée aberrante (le format PDF plafonne à 14 400 unités,
+/// éventuellement agrandies par `/UserUnit`) et ne reçoit pas de filigrane.
+const MAX_PAGE_SIDE: f64 = 1_000_000.0;
 
 /// Calcule les transformations « bloc de texte (em, centré sur 0) → page affichée (pt) ».
+/// Une page aux dimensions aberrantes (nulles, infinies, gigantesques) n'en reçoit aucune.
 pub(crate) fn placements(
     page_width: f64,
     page_height: f64,
@@ -22,6 +28,10 @@ pub(crate) fn placements(
     block_height: f64,
     spec: &WatermarkSpec,
 ) -> Vec<Affine> {
+    let plausible = |side: f64| side.is_finite() && side > 0.0 && side <= MAX_PAGE_SIDE;
+    if !(plausible(page_width) && plausible(page_height) && block_width > 0.0 && block_height > 0.0) {
+        return Vec::new();
+    }
     let angle = match spec.angle {
         Angle::Diagonal => page_height.atan2(page_width),
         Angle::Degrees(degrees) => f64::from(degrees).to_radians(),
@@ -88,10 +98,17 @@ fn tiles(
     let (sin, cos) = angle.sin_cos();
     let (half_width, half_height) = (page_width / 2.0, page_height / 2.0);
     loop {
-        let columns = (reach / step_x).ceil() as i64 + 1;
-        let rows = (reach / step_y).ceil() as i64 + 1;
+        // La grille est bornée avant toute allocation ; la liste des tuiles retenues aussi.
+        let columns = (reach / step_x).ceil() + 1.0;
+        let rows = (reach / step_y).ceil() + 1.0;
+        if (2.0 * columns + 1.0) * (2.0 * rows + 1.0) > MAX_GRID_CELLS {
+            step_x *= 1.25;
+            step_y *= 1.25;
+            continue;
+        }
+        let (columns, rows) = (columns as i64, rows as i64);
         let mut centers = Vec::new();
-        for row in -rows..=rows {
+        'grid: for row in -rows..=rows {
             // Une rangée sur deux est décalée d'une demi-tuile (quinconce).
             let offset = if row.rem_euclid(2) == 1 { step_x / 2.0 } else { 0.0 };
             let y = row as f64 * step_y;
@@ -103,6 +120,9 @@ fn tiles(
                 let dy = (py.abs() - half_height).max(0.0);
                 if dx.hypot(dy) <= radius {
                     centers.push((x, y));
+                    if centers.len() > MAX_TILES {
+                        break 'grid;
+                    }
                 }
             }
         }
@@ -225,6 +245,30 @@ mod tests {
             &spec(Layout::Tiled(Density::High), FontSize::Points(4.0), Angle::Degrees(0.0)),
         );
         assert!(!m.is_empty() && m.len() <= MAX_TILES, "{}", m.len());
+    }
+
+    #[test]
+    fn absurd_pages_get_no_watermark_and_cost_nothing() {
+        let tiled = spec(
+            Layout::Tiled(Density::High),
+            FontSize::Points(4.0),
+            Angle::Degrees(30.0),
+        );
+        for (w, h) in [
+            (1e30, 1e30),
+            (f64::INFINITY, 100.0),
+            (f64::NAN, 100.0),
+            (0.0, 100.0),
+            (-5.0, 100.0),
+        ] {
+            assert!(placements(w, h, 2.0, 1.2, &tiled).is_empty(), "{w}x{h}");
+        }
+        let elongated = placements(MAX_PAGE_SIDE, 10.0, 2.0, 1.2, &tiled);
+        assert!(
+            !elongated.is_empty() && elongated.len() <= MAX_TILES,
+            "{}",
+            elongated.len()
+        );
     }
 
     #[test]

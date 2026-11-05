@@ -63,6 +63,14 @@ PDFium garde en mémoire tout objet lu tant que le document est ouvert : le docu
 donc rouvert régulièrement, à une fréquence calculée pour qu'environ 192 Mo du fichier au
 plus restent chargés. Une page est rendue à 40 mégapixels au maximum.
 
+## Robustesse face aux fichiers hostiles
+
+- Dimensions de page aberrantes (infinies, gigantesques) : page ignorée et signalée, la
+  mosaïque est bornée avant toute allocation (4 000 occurrences au plus par page).
+- Flux compressés : lopdf limite la décompression à 256 Mo par flux.
+- Fichier temporaire : nom aléatoire, création exclusive (pas de lien symbolique suivi),
+  supprimé en cas d'échec.
+
 ## Mesures
 
 PC de développement (6 cœurs), binaires `--release`. « Mémoire » = pic de mémoire
@@ -73,6 +81,11 @@ privée du processus.
 | 20 000 pages, 5,8 Mo | superposé | 3,0 s | 166 Mo | 9,8 Mo |
 | 800 pages, **1,87 Go** (photos) | superposé | 6,5 s | 24 Mo | 1,87 Go |
 | 800 pages, 1,87 Go (photos) | incrusté, 150 ppp | 59 s | 331 Mo | 1,37 Go |
+| 20 000 pages, 5,8 Mo | incrusté, 150 ppp | 10 min 20 s | 126 Mo | 4,9 Go |
+
+En mode incrusté, chaque page devient une image : un document texte grossit beaucoup
+(environ 250 Ko par page A4 à 150 ppp). Baisser la résolution à 100 ppp divise la taille
+par deux environ ; le mode superposé, lui, ne l'augmente presque pas.
 
 Pour reproduire : `cargo run --release -p filigrane-core --example generate_pdf -- gros.pdf 800 2`.
 

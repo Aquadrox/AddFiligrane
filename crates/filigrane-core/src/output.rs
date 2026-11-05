@@ -1,10 +1,15 @@
 //! Écriture atomique du fichier produit : un fichier temporaire voisin est renommé
 //! seulement en cas de succès, si bien qu'un échec ou une annulation ne laisse jamais
 //! de PDF tronqué à la place de la destination.
+//!
+//! Le fichier temporaire porte un nom aléatoire et est créé exclusivement
+//! (`O_EXCL` / `CREATE_NEW`) : un lien symbolique préparé à l'avance n'est pas suivi.
 
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
+
+use tempfile::NamedTempFile;
 
 use crate::error::{Error, Result};
 
@@ -13,8 +18,8 @@ const BUFFER_SIZE: usize = 1 << 20;
 #[derive(Debug)]
 pub(crate) struct AtomicOutput {
     final_path: PathBuf,
-    temp_path: PathBuf,
-    writer: Option<CountingWriter<BufWriter<File>>>,
+    /// Le fichier temporaire est supprimé automatiquement s'il n'est pas validé.
+    writer: CountingWriter<BufWriter<NamedTempFile>>,
 }
 
 impl AtomicOutput {
@@ -22,20 +27,26 @@ impl AtomicOutput {
         let file_name = final_path
             .file_name()
             .ok_or_else(|| Error::write(final_path, io::Error::other("nom de fichier manquant")))?;
-        let mut temp_name = std::ffi::OsString::from(".");
-        temp_name.push(file_name);
-        temp_name.push(".filigrane-tmp");
-        let temp_path = final_path.with_file_name(temp_name);
-        let file = File::create(&temp_path).map_err(|e| Error::write(final_path, e))?;
+        let directory = final_path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let mut prefix = std::ffi::OsString::from(".");
+        prefix.push(file_name);
+        prefix.push(".");
+        let temp = tempfile::Builder::new()
+            .prefix(&prefix)
+            .suffix(".filigrane-tmp")
+            .tempfile_in(directory)
+            .map_err(|e| Error::write(final_path, e))?;
         Ok(Self {
             final_path: final_path.to_owned(),
-            temp_path,
-            writer: Some(CountingWriter::new(BufWriter::with_capacity(BUFFER_SIZE, file))),
+            writer: CountingWriter::new(BufWriter::with_capacity(BUFFER_SIZE, temp)),
         })
     }
 
-    pub fn writer(&mut self) -> &mut CountingWriter<BufWriter<File>> {
-        self.writer.as_mut().expect("sortie déjà validée")
+    pub fn writer(&mut self) -> &mut CountingWriter<BufWriter<NamedTempFile>> {
+        &mut self.writer
     }
 
     pub fn write_error(&self, source: io::Error) -> Error {
@@ -44,25 +55,19 @@ impl AtomicOutput {
 
     /// Vide les tampons, force l'écriture sur disque et remplace la destination.
     /// Renvoie la taille du fichier produit.
-    pub fn commit(mut self) -> Result<u64> {
-        let writer = self.writer.take().expect("sortie déjà validée");
-        let size = writer.position();
-        let file = writer
+    pub fn commit(self) -> Result<u64> {
+        let size = self.writer.position();
+        let temp = self
+            .writer
             .into_inner()
             .into_inner()
             .map_err(|e| Error::write(&self.final_path, e.into_error()))?;
-        file.sync_all().map_err(|e| Error::write(&self.final_path, e))?;
-        drop(file);
-        fs::rename(&self.temp_path, &self.final_path).map_err(|e| Error::write(&self.final_path, e))?;
+        temp.as_file()
+            .sync_all()
+            .map_err(|e| Error::write(&self.final_path, e))?;
+        temp.persist(&self.final_path)
+            .map_err(|e| Error::write(&self.final_path, e.error))?;
         Ok(size)
-    }
-}
-
-impl Drop for AtomicOutput {
-    fn drop(&mut self) {
-        if self.writer.take().is_some() {
-            let _ = fs::remove_file(&self.temp_path);
-        }
     }
 }
 
@@ -152,6 +157,30 @@ mod tests {
         }
         assert_eq!(fs::read(&target).unwrap(), b"ancien");
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn temporary_file_does_not_follow_a_planted_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("out.pdf");
+        #[cfg(unix)]
+        {
+            // L'ancien nom prévisible, piégé : il ne doit plus servir.
+            let victim = dir.path().join("victime.txt");
+            fs::write(&victim, b"intact").unwrap();
+            std::os::unix::fs::symlink(&victim, dir.path().join(".out.pdf.filigrane-tmp")).unwrap();
+            let mut output = AtomicOutput::create(&target).unwrap();
+            output.writer().write_all(b"pdf").unwrap();
+            output.commit().unwrap();
+            assert_eq!(fs::read(&victim).unwrap(), b"intact");
+        }
+        let first = AtomicOutput::create(&target).unwrap();
+        let second = AtomicOutput::create(&target).unwrap();
+        assert_ne!(
+            first.writer.inner.get_ref().path(),
+            second.writer.inner.get_ref().path(),
+            "chaque traitement a son propre fichier temporaire"
+        );
     }
 
     #[test]

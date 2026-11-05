@@ -14,6 +14,7 @@ memmap2.workspace = true
 pdfium-render.workspace = true
 rayon.workspace = true
 subsetter.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tiny-skia.workspace = true
 ttf-parser.workspace = true

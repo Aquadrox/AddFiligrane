@@ -250,8 +250,12 @@ impl<'a> EditBuilder<'a> {
             .and_then(|r| r.as_i64().ok())
             .map_or(0, normalize_rotation);
 
+        let matrices = self.page_placements(crop_box, rotation);
+        if matrices.is_empty() {
+            return false;
+        }
         let (resources, name) = self.resources_with_watermark(original);
-        let draw = self.draw_operations(crop_box, rotation, &name);
+        let draw = Self::draw_operations(&matrices, &name);
 
         let mut new_contents = Vec::with_capacity(contents.len() + 2);
         match self.layer {
@@ -384,24 +388,32 @@ impl<'a> EditBuilder<'a> {
         (resources, name)
     }
 
-    /// Opérateurs qui dessinent le filigrane sur une page, marqués comme artefact
-    /// de pagination pour que les lecteurs d'écran l'ignorent.
-    fn draw_operations(&self, crop_box: Rect, rotation: i64, name: &str) -> Vec<u8> {
+    /// Repères du filigrane dans l'espace utilisateur de la page ; vide si la page a
+    /// des dimensions aberrantes.
+    fn page_placements(&self, crop_box: Rect, rotation: i64) -> Vec<Affine> {
         let (display_width, display_height) = if rotation % 180 == 0 {
             (crop_box.width(), crop_box.height())
         } else {
             (crop_box.height(), crop_box.width())
         };
         let to_user = display_to_user(crop_box, rotation);
-        let mut ops = String::from("/Artifact <</Type /Pagination /Subtype /Watermark>> BDC\nq\n");
-        for placement in placements(
+        placements(
             display_width,
             display_height,
             self.block.width,
             self.block.height,
             &self.job.spec,
-        ) {
-            let matrix = placement.then(&to_user);
+        )
+        .into_iter()
+        .map(|placement| placement.then(&to_user))
+        .collect()
+    }
+
+    /// Opérateurs qui dessinent le filigrane, marqués comme artefact de pagination pour
+    /// que les lecteurs d'écran l'ignorent.
+    fn draw_operations(matrices: &[Affine], name: &str) -> Vec<u8> {
+        let mut ops = String::from("/Artifact <</Type /Pagination /Subtype /Watermark>> BDC\nq\n");
+        for matrix in matrices {
             ops.push_str(&format!("q {} cm /{name} Do Q\n", matrix.to_pdf_operands()));
         }
         ops.push_str("Q\nEMC\n");

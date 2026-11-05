@@ -393,3 +393,27 @@ fn heavy_file_is_copied_without_being_loaded() {
     assert!(report.output_bytes - input_len < 100_000);
     load(&output);
 }
+
+#[test]
+fn absurd_page_sizes_are_skipped_quickly() {
+    let dir = tempfile::tempdir().unwrap();
+    let (input, output) = (dir.path().join("in.pdf"), dir.path().join("out.pdf"));
+    let huge = PageSpec {
+        media_box: [0.0, 0.0, 1e30, 1e30],
+        ..PageSpec::a4()
+    };
+    build_pdf(&input, &[huge, PageSpec::a4()], Structure::default());
+
+    let started = std::time::Instant::now();
+    let report = run(&job(&input, &output, spec("X"), overlay())).unwrap();
+    assert!(started.elapsed().as_secs() < 5);
+    assert_eq!((report.pages_watermarked, report.pages_skipped), (1, 1));
+    assert_centered_or_tiled(&output);
+}
+
+fn assert_centered_or_tiled(output: &std::path::Path) {
+    assert!(
+        !red_pixels(&render(output, 1)).is_empty(),
+        "la page normale doit être filigranée"
+    );
+}
