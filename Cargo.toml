@@ -8,7 +8,7 @@ edition = "2024"
 rust-version = "1.88"
 license = "MIT"
 authors = ["Florian Langlois"]
-repository = "https://github.com/Aquadrox/filigrane-pdf"
+repository = "https://github.com/Aquadrox/AddFiligrane"
 
 [workspace.dependencies]
 filigrane-core = { path = "crates/filigrane-core" }
