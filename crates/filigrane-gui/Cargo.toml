@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-eframe.workspace = true
+eframe = { workspace = true, features = ["glow"] }
 filigrane-core.workspace = true
 opener.workspace = true
 rfd.workspace = true
@@ -22,7 +22,7 @@ serde.workspace = true
 [lints]
 workspace = true
 
-[target.'cfg(windows)'.build-dependencies]
+[build-dependencies]
 winresource = "0.1"
 
 [dev-dependencies]

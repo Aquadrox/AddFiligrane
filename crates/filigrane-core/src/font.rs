@@ -205,6 +205,11 @@ impl TextBlock {
     }
 }
 
+/// Fichier TrueType de la police intégrée (utile aux interfaces comme police de secours).
+pub fn bundled_font_data(weight: FontWeight) -> &'static [u8] {
+    font(weight).data
+}
+
 /// Vérifie que `text` peut servir de filigrane avec cette graisse.
 pub fn check_text(text: &str, weight: FontWeight) -> Result<()> {
     TextBlock::layout(text, weight).map(|_| ())

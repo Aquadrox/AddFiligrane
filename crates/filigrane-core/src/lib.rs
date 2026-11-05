@@ -37,7 +37,7 @@ mod spec;
 use std::path::{Path, PathBuf};
 
 pub use crate::error::{Error, Result};
-pub use crate::font::check_text;
+pub use crate::font::{bundled_font_data, check_text};
 pub use crate::pages::{PageRange, PageSelection};
 pub use crate::pdfium::{PDFIUM_PATH_ENV, pdfium_available};
 pub use crate::progress::{CancelToken, Progress, ProgressSink};

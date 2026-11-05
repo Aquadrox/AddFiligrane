@@ -5,6 +5,16 @@ use eframe::egui::{self, Color32, FontId, TextStyle};
 const ACCENT: Color32 = Color32::from_rgb(0x2F, 0x6F, 0xE4);
 
 pub fn apply(ctx: &egui::Context) {
+    // Police de secours pour les symboles (◀ ▶ ✔ ✖…) : l'interface ne dépend pas des
+    // polices installées sur le poste.
+    ctx.add_font(egui::FontInsert::new(
+        "DejaVuSans",
+        egui::FontData::from_static(filigrane_core::bundled_font_data(filigrane_core::FontWeight::Regular)),
+        vec![egui::InsertFontFamily {
+            family: egui::FontFamily::Proportional,
+            priority: egui::FontPriority::Lowest,
+        }],
+    ));
     ctx.set_theme(egui::Theme::Light);
     ctx.style_mut_of(egui::Theme::Light, |style| {
         style.text_styles = [

@@ -256,7 +256,6 @@ impl FiligraneApp {
         section(ui, "1. Document", |ui| match &self.input {
             Some(path) => {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("📄").size(20.0));
                     ui.vertical(|ui| {
                         ui.label(RichText::new(file_name(path)).strong())
                             .on_hover_text(path.display().to_string());
@@ -281,7 +280,7 @@ impl FiligraneApp {
                 }
             }
             None => {
-                let button = egui::Button::new(RichText::new("📂  Choisir un PDF…").size(16.0))
+                let button = egui::Button::new(RichText::new("Choisir un PDF…").size(16.0))
                     .min_size(egui::vec2(ui.available_width(), 44.0));
                 if ui.add(button).on_hover_text("Ctrl+O").clicked() {
                     self.pick_input(ui.ctx());

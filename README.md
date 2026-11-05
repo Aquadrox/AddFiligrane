@@ -45,6 +45,12 @@ cargo run -p filigrane-gui        # l'application
 cargo build --release --workspace # puis ./packaging/windows/package.ps1 [-Installer]
 ```
 
+Depuis Linux, `./scripts/build-windows.sh` compile en croisé (MinGW-w64) et produit
+`dist/FiligranePDF-x.y.z-windows-x64.zip`.
+
+L'interface utilise Direct3D 12/Vulkan (wgpu) et bascule seule sur OpenGL si le poste
+n'en dispose pas ; `FILIGRANE_RENDERER=glow` force OpenGL.
+
 La CI GitHub Actions (`.github/workflows`) vérifie le format, clippy et les tests sous
 Linux et Windows, et produit l'archive portable ; une étiquette `vX.Y.Z` publie l'archive
 et l'installeur.
